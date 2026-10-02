@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Browser Selector
+Exec=/home/user/.local/bin/browser-selector --settings
+MimeType=x-scheme-handler/unknown;x-scheme-handler/about;text/html;x-scheme-handler/http;x-scheme-handler/https;

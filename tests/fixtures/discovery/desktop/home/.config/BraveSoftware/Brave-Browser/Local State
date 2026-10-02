@@ -1,0 +1,18 @@
+{
+ "profile": {
+  "info_cache": {
+   "Profile 1": {
+    "name": "home",
+    "is_using_default_name": false,
+    "avatar_icon": "x"
+   }
+  },
+  "profiles_order": [
+   "Profile 1"
+  ],
+  "last_used": "Profile 1"
+ },
+ "browser": {
+  "enabled_labs_experiments": []
+ }
+}

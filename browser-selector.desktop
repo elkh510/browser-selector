@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Browser Selector
+Exec=@BIN@ %u
+MimeType=x-scheme-handler/unknown;x-scheme-handler/about;text/html;x-scheme-handler/http;x-scheme-handler/https;
+Categories=Network;WebBrowser;
+NoDisplay=true
+Terminal=false

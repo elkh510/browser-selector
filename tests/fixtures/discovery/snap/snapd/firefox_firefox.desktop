@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Firefox Web Browser
+Name[ru]=Браузер
+GenericName=Web Browser
+Exec=env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/firefox_firefox.desktop /snap/bin/firefox %U
+Terminal=false
+Icon=/snap/firefox/6836/default256.png
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;

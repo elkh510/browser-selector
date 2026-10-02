@@ -1,0 +1,8 @@
+{
+  "appTeams": {"selectedTeamId": "T01ACME0001"},
+  "workspaces": {
+    "T01ACME0001": {"name": "Acme", "domain": "acme", "id": "T01ACME0001", "order": 0},
+    "T01ABCDEF12": {"name": "Globex", "domain": "globex", "id": "T01ABCDEF12", "order": 1}
+  },
+  "workspacesMeta": {"selectedWorkspaceId": "T01ACME0001", "isLoading": false}
+}

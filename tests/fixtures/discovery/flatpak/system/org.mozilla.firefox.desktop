@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Firefox
+Name[ru]=Браузер
+GenericName=Web Browser
+Exec=/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=firefox --file-forwarding org.mozilla.firefox @@u %U @@
+Terminal=false
+Icon=org.mozilla.firefox
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;

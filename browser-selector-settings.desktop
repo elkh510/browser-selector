@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Browser Selector
+Comment=Browsers and rules for opening links
+Exec=@BIN@ --settings
+Icon=web-browser
+Categories=Settings;Network;
+Keywords=browser;default;link;rule;
+StartupWMClass=browser-selector
+Terminal=false

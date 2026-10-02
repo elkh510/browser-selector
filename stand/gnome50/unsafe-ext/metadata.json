@@ -1,0 +1,6 @@
+{
+  "uuid": "unsafe@test",
+  "name": "unsafe mode for the test stand",
+  "description": "Turns on unsafe mode so org.gnome.Shell.Eval answers",
+  "shell-version": ["50"]
+}
