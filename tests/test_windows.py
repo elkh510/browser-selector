@@ -505,6 +505,14 @@ class SettingsOption(HandlerCase):
         self.assertEqual((code, self.window_loads), (1, 0))
         self.assertIn("the settings window cannot be shown: no display", err)
 
+    def test_a_start_without_a_url_is_the_settings_window(self):
+        # The icon in the app grid: Exec has %u and there is no URL to put there
+        for argv in ([], ["--config", "/tmp/x.ini"]):
+            with self.subTest(argv=argv):
+                code, out, err = self.handle(*argv)
+                self.assertEqual((code, self.started), (1, []))
+                self.assertIn("the settings window cannot be shown: no display", err)
+
     def test_gi_is_not_installed(self):
         self.env["DISPLAY"] = ":99"
         code, out, err = self.handle("--settings", settings=ImportError("No module named 'gi'"))

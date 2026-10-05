@@ -102,7 +102,6 @@ class Layout(Install):
         self.assertEqual((code, err), (0, ""))
         self.assertEqual(self.installed(), [
             ".config/browser-selector/config.ini", ".local/bin/browser-selector",
-            ".local/share/applications/browser-selector-settings.desktop",
             ".local/share/applications/browser-selector.desktop",
             ".local/share/browser-selector/browser_selector.py",
             ".local/share/browser-selector/browser_selector_gui.py"])
@@ -147,19 +146,37 @@ class Layout(Install):
         self.assertNotIn("No module named", err)
         self.assertNotIn("not the installed windows", err)
 
+    def test_the_launcher_of_the_package_starts_the_handler(self):
+        # Without site (-S) and as an imported module: the windows still find PyGObject
+        lib = os.path.join(self.tmp, "package")
+        os.makedirs(lib)
+        for name in ("browser_selector.py", "browser_selector_gui.py", "packaging/launcher"):
+            shutil.copy(os.path.join(ROOT, name), lib)
+        launcher = os.path.join(lib, "launcher")
+        self.assertEqual(read(launcher).splitlines()[0], "#!/usr/bin/python3 -IS")
+        code, out, err = self.run_script(launcher, "--version")
+        self.assertEqual((code, out, err), (0, f"browser-selector {bs.VERSION}\n", ""))
+        code, out, err = self.run_script(launcher, DISPLAY="/nonexistent/x:0")
+        self.assertEqual(code, 1)
+        self.assertRegex(err, "the settings window cannot be shown: "
+                              "(the display cannot be opened|GTK 4 and libadwaita are needed)")
+        self.assertNotIn("No module named", err)
+
     def test_desktop_entries(self):
         self.install()
         self.assertEqual(self.exec_line(), f"{self.bin} %u")
-        self.assertEqual(self.exec_line("browser-selector-settings.desktop"), f"{self.bin} --settings")
-        handler = read(os.path.join(self.apps, "browser-selector.desktop"))
-        self.assertIn("NoDisplay=true\n", handler)
-        self.assertIn("x-scheme-handler/http;x-scheme-handler/https;", handler)
-        settings = read(os.path.join(self.apps, "browser-selector-settings.desktop"))
-        self.assertNotIn("NoDisplay", settings)
-        self.assertNotIn("MimeType", settings)
-        self.assertNotIn("@BIN@", handler + settings)
-        for entry in ("browser-selector.desktop", "browser-selector-settings.desktop"):
-            self.assertEqual(os.stat(os.path.join(self.apps, entry)).st_mode & 0o777, 0o644)
+        entry = read(os.path.join(self.apps, "browser-selector.desktop"))
+        self.assertNotIn("NoDisplay", entry)
+        self.assertIn("x-scheme-handler/http;x-scheme-handler/https;", entry)
+        self.assertNotIn("@BIN@", entry)
+        self.assertEqual(os.stat(os.path.join(self.apps, "browser-selector.desktop")).st_mode & 0o777, 0o644)
+
+    def test_the_settings_entry_of_an_older_install_is_removed(self):
+        os.makedirs(self.apps)
+        old = os.path.join(self.apps, "browser-selector-settings.desktop")
+        write_script(old, "[Desktop Entry]\n")
+        self.assertEqual(self.install()[0], 0)
+        self.assertFalse(os.path.lexists(old))
 
     def test_the_first_config_comes_from_discovery(self):
         write_script(os.path.join(self.fake, "default"), "google-chrome.desktop\n")
@@ -225,7 +242,6 @@ class Layout(Install):
         os.makedirs(self.apps)
         os.makedirs(self.lib)
         for path in (os.path.join(self.apps, "browser-selector.desktop"),
-                     os.path.join(self.apps, "browser-selector-settings.desktop"),
                      os.path.join(self.lib, "browser_selector.py"), os.path.join(self.lib, "browser_selector_gui.py")):
             os.symlink(victim, path)
         self.assertEqual(self.install()[0], 0)
@@ -233,8 +249,7 @@ class Layout(Install):
         self.assertEqual(os.stat(victim).st_mode & 0o777, 0o755)
         self.assertFalse(os.path.islink(os.path.join(self.apps, "browser-selector.desktop")))
         self.assertEqual(self.exec_line(), f"{self.bin} %u")
-        self.assertEqual(sorted(os.listdir(self.apps)),
-                         ["browser-selector-settings.desktop", "browser-selector.desktop"])
+        self.assertEqual(os.listdir(self.apps), ["browser-selector.desktop"])
 
     def test_no_temporary_file_is_left(self):
         self.install()
@@ -261,7 +276,6 @@ class OddHome(Install):
         self.install()
         # The reader of discovery follows the specification: escapes of a string, then the quoting
         self.assertEqual(bs.exec_argv(self.exec_line()), [self.bin])
-        self.assertEqual(bs.exec_argv(self.exec_line("browser-selector-settings.desktop")), [self.bin, "--settings"])
 
     def test_glib_reads_it_back_too(self):
         self.install()
@@ -335,7 +349,7 @@ class OddPlaces(Install):
         checkout = os.path.join(share, "browser-selector")
         os.makedirs(checkout)
         for name in ("browser_selector.py", "browser_selector_gui.py", "browser-selector.desktop",
-                     "browser-selector-settings.desktop", "install.sh", "uninstall.sh"):
+                     "install.sh", "uninstall.sh"):
             shutil.copy(os.path.join(ROOT, name), checkout)
         before = self.tree(checkout)
         for script in ("install.sh", "uninstall.sh"):

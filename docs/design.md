@@ -1,6 +1,6 @@
 # Design
 
-_verified: 2026-10-02_
+_verified: 2026-10-05_
 
 `browser-selector` is registered as the default web browser. For every link
 it looks at where the link came from and starts the browser and profile the
@@ -14,10 +14,10 @@ extension. Discovery of browsers, the picker and the settings window are in
 
     browser_selector.py        the handler and everything without a window
     browser_selector_gui.py    picker and settings window
-    browser-selector.desktop   desktop entry of the handler
-    browser-selector-settings.desktop   desktop entry of the settings window
+    browser-selector.desktop   the one desktop entry: default browser and app grid icon
     config.example.ini         example rules
     install.sh, uninstall.sh
+    packaging/                 the .deb: build-deb.sh, inner.sh, launcher, Dockerfile
     tests/                     unit tests (unittest)
     stand/                     end to end stands, see stand/README.md
     docs/
@@ -28,7 +28,8 @@ extension. Discovery of browsers, the picker and the settings window are in
     browser-selector [--config PATH] --explain [URL] print what it sees and what
                                                      it would run, start nothing
     browser-selector [--config PATH] --check         validate the config
-    browser-selector [--config PATH] --settings      the settings window
+    browser-selector [--config PATH] [--settings]    the settings window: a start
+                                                     without a URL is one too
     browser-selector --discover                      print the browsers and
                                                      profiles found, change nothing
     browser-selector [--config PATH] --init-config   write a first config from

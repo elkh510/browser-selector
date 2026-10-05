@@ -11,7 +11,6 @@ entry are an Adw.ActionRow around a Gtk.Entry, forms are an Adw.Window.
 
 import os
 import shlex
-import shutil
 import sys
 
 import browser_selector as bs
@@ -225,7 +224,7 @@ class Settings:
 
     def __init__(self, app, path, env):
         self.path, self.env = path, env
-        self.which = lambda program: shutil.which(program, path=env.get("PATH") or os.defpath)
+        self.which = bs.path_which(env)
         self.model, self.problems = bs.empty_model(), []
         self.rows = []          # (group, row) of everything fill() put there
         self.filling = False    # fill() moves the list of the default: that is not a change
@@ -433,15 +432,18 @@ class Settings:
             print(bs.printable("browser-selector: not saved: " + "; ".join(errors)), file=sys.stderr)
         return "\n".join(errors) or None
 
-    def remove(self, without, name):
-        error = self.change(lambda model: without(model, name))
+    def change_or_say(self, edit):
+        """change() for a button: a refusal is shown, not returned to a form."""
+        error = self.change(edit)
         if error:
             self.say(error)
+        return error
+
+    def remove(self, without, name):
+        self.change_or_say(lambda model: without(model, name))
 
     def move(self, name, step):
-        error = self.change(lambda model: bs.move_rule(model, name, step))
-        if error:
-            self.say(error)
+        self.change_or_say(lambda model: bs.move_rule(model, name, step))
 
     def default_picked(self, *args):
         if not self.filling and self.default.get_selected() < len(self.default_names):
@@ -449,9 +451,7 @@ class Settings:
             GLib.idle_add(self.set_default, self.default_names[self.default.get_selected()])
 
     def set_default(self, name):
-        error = self.change(lambda model: bs.with_default(model, name))
-        if error:
-            self.say(error)
+        if self.change_or_say(lambda model: bs.with_default(model, name)):
             self.fill_default()  # the row goes back to what is saved
         return GLib.SOURCE_REMOVE
 

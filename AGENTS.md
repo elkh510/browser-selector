@@ -43,8 +43,9 @@ python3 -m unittest discover -s tests
 python3 browser_selector.py --config config.example.ini --check
 bash stand/x11/run.sh [scenario.sh]       # Ubuntu 22.04, X11; needs docker
 bash stand/gnome50/run.sh [scenario.sh]   # GNOME Shell 50, Wayland; needs docker
+bash packaging/build-deb.sh               # dist/browser-selector_<version>_all.deb; needs docker
 browser-selector --explain URL            # what the installed handler sees and would run
 ```
 
-The docker socket is refused inside the agent sandbox: the stand commands run with the
+The docker socket is refused inside the agent sandbox: the stand and package commands run with the
 sandbox off, nothing else needs that.

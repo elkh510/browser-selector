@@ -132,7 +132,7 @@ class Arguments(HandlerCase):
                 self.assertEqual(self.started, [CHROME_MAIN + [url]])
 
     def test_one_url_is_expected(self):
-        for argv in ([], [URL, "https://other.org/"], ["--config"], ["--check", URL], ["--version", URL],
+        for argv in ([URL, "https://other.org/"], ["--config"], ["--check", URL], ["--version", URL],
                      ["--explain", URL, URL]):
             with self.subTest(argv=argv):
                 code, out, err = self.handle(*argv)

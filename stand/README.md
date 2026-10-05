@@ -543,9 +543,9 @@ both give a picker that has the keyboard focus on its own
 (`global.display.focus_window`), and no window asked for attention, so the
 shell showed no "is ready" notification:
 
-    picker:  client=wayland	id=-	instance=browser-selector	class=browser-selector	title=Open link	pid=1176	app=browser-selector-settings.desktop	app_name=Browser Selector	rect=420,299,440,235	focused=yes
+    picker:  client=wayland	id=-	instance=browser-selector	class=browser-selector	title=Open link	pid=1176	app=browser-selector.desktop	app_name=Browser Selector	rect=420,299,440,235	focused=yes
 
-The shell files the picker under `browser-selector-settings.desktop`, through
+The shell files the picker under `browser-selector.desktop`, through
 `StartupWMClass=browser-selector` of that entry. A digit, Enter, Down and
 Enter, a click on a row start the right browser with the right argv from the
 cgroup of the app, Esc and closing the window start nothing with exit code 0,
@@ -569,7 +569,7 @@ nothing on this path.
 browser icons of Papirus copied into the hicolor of the throwaway home, where
 the packages of the browsers would put theirs. The settings window is a
 Wayland window with the app id `browser-selector`, and the shell takes it for
-the app of `browser-selector-settings.desktop`.
+the app of `browser-selector.desktop`.
 
 Found on the way, not asserted by a scenario:
 

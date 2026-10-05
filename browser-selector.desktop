@@ -1,8 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=Browser Selector
+Comment=Browsers and rules for opening links
 Exec=@BIN@ %u
+Icon=web-browser
 MimeType=x-scheme-handler/unknown;x-scheme-handler/about;text/html;x-scheme-handler/http;x-scheme-handler/https;
 Categories=Network;WebBrowser;
-NoDisplay=true
+Keywords=browser;default;link;rule;
+StartupWMClass=browser-selector
 Terminal=false

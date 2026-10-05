@@ -111,17 +111,17 @@ press Escape
 window_gone "$PICKER" || true
 
 echo "== the settings window =="
-"$HANDLER" --settings >"$OUT_DIR/settings.log" 2>&1 &
+"$HANDLER" >"$OUT_DIR/settings.log" 2>&1 &
 SETTINGS_PID=$!
 APP_PIDS="$APP_PIDS $SETTINGS_PID"
 wait_window "$SETTINGS"
-expect_true "browser-selector --settings shows a window with the focus" wait_focus "$SETTINGS"
+expect_true "browser-selector without a URL shows the settings window with the focus" wait_focus "$SETTINGS"
 wait_app_known || true
 shell window "$SETTINGS" | sed 's/^/     /'
 expect_equal "a native Wayland window, app id browser-selector" \
     "wayland browser-selector" "$(window_field "$SETTINGS" client) $(window_field "$SETTINGS" class)"
-expect_equal "the shell takes it for the app of browser-selector-settings.desktop" \
-    "browser-selector-settings.desktop" "$(window_field "$SETTINGS" app)"
+expect_equal "the shell takes it for the app of browser-selector.desktop" \
+    "browser-selector.desktop" "$(window_field "$SETTINGS" app)"
 press alt+1
 shot settings-browsers
 press alt+2

@@ -16,8 +16,14 @@ it already on a stock Ubuntu desktop. No daemon, no GNOME Shell extension.
 
 ## Install
 
+    bash packaging/build-deb.sh     # a package: dist/browser-selector_<version>_all.deb
+    sudo apt install ./dist/browser-selector_*.deb
+    browser-selector --init-config  # the first config, from the browsers found
+
+or, without a package and a little slower on every click:
+
     bash install.sh                 # into ~/.local, the default browser stays
-    browser-selector --settings     # or "Browser Selector" in the app grid
+    browser-selector                # the settings; or "Browser Selector" in the app grid
 
 The first config is written from the browsers and profiles found, with the
 current default browser as the default and no rules. Making it the default

@@ -183,9 +183,9 @@ class LineBreaks(HandlerCase):
         path = self.write_config("")
         with open(path, "wb") as file:
             file.write(SMALL.encode() + b"[rule cr]\ntitle = a\rb\x0bc\nbrowser = main\n")
+        # Read as one line, and refused by --check: no value may hold a control character.
         config, errors = bs.load_config(path)
-        self.assertEqual(errors, [])
-        self.assertEqual(config["rules"][-1]["title"].pattern, "a\rb\x0bc")
+        self.assertEqual((config, errors), (None, ["[rule cr] title: has a line break or a control character"]))
         self.assertEqual(bs.load_model(path)[0]["rules"]["cr"], {"title": "a\rb\x0bc", "browser": "main"})
 
     def test_a_file_with_dos_line_ends(self):

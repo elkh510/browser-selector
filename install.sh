@@ -12,7 +12,8 @@ for variable in XDG_DATA_HOME XDG_CONFIG_HOME XDG_STATE_HOME; do
 done
 
 entry=browser-selector.desktop
-settings_entry=browser-selector-settings.desktop
+# The settings entry of the installs before 0.3.0: removed when it is found.
+old_entry=browser-selector-settings.desktop
 data="${XDG_DATA_HOME:-$HOME/.local/share}"
 lib="$data/browser-selector"
 apps="$data/applications"
@@ -97,10 +98,9 @@ if ! mv -fT "$link" "$bin"; then
 fi
 
 word=$(desktop_word "$bin")
-for file in "$entry" "$settings_entry"; do
-    desktop=$(<"$here/$file")
-    printf '%s%s%s\n' "${desktop%%@BIN@*}" "$word" "${desktop#*@BIN@}" | put 644 "$apps/$file"
-done
+desktop=$(<"$here/$entry")
+printf '%s%s%s\n' "${desktop%%@BIN@*}" "$word" "${desktop#*@BIN@}" | put 644 "$apps/$entry"
+rm -f "$apps/$old_entry"
 
 current=$(xdg-settings get default-web-browser 2>/dev/null || true)
 # The browser to go back to: the current default, or the recorded one when
@@ -120,7 +120,7 @@ else
 fi
 echo "Handler:      $bin -> $lib/browser_selector.py"
 echo "Desktop file: $apps/$entry"
-echo "Settings:     $bin --settings, or Browser Selector in the app grid"
+echo "Settings:     $bin, or Browser Selector in the app grid"
 
 if [[ $# -eq 0 ]]; then
     echo

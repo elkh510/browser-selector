@@ -10,24 +10,23 @@ without a window live here too, the contract is docs/design-gui.md.
 
 import configparser
 import errno
-import json
+import functools
 import os
 import re
 import select
 import shlex
-import shutil
 import stat
 import subprocess
 import sys
 import time
 from urllib.parse import urlsplit
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 USAGE = """\
 usage: browser-selector [--config PATH] URL
+       browser-selector [--config PATH] [--settings]
        browser-selector [--config PATH] --explain [URL]
        browser-selector [--config PATH] --check
-       browser-selector [--config PATH] --settings
        browser-selector [--config PATH] --init-config
        browser-selector --discover
        browser-selector --version"""
@@ -57,6 +56,7 @@ ASK = "ask"
 # and GLib know more than the line feed), every control character but the tab, a lone surrogate.
 UNWRITABLE = re.compile("[\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]")
 ENTRY = "browser-selector.desktop"
+# The second one is the settings entry of the installs before 0.3.0.
 OWN_ENTRIES = {ENTRY, "browser-selector-settings.desktop"}
 REGEX_FLAGS = {"app": re.IGNORECASE, "window": re.IGNORECASE, "title": 0, "url": 0,
                "probe_match": re.MULTILINE}
@@ -69,9 +69,24 @@ def xdg_dir(env, variable, fallback):
     return value if os.path.isabs(value) else os.path.join(env.get("HOME") or os.path.expanduser("~"), fallback)
 
 
+def config_home(env):
+    return xdg_dir(env, "XDG_CONFIG_HOME", ".config")
+
+
+def state_dir(env):
+    """Where the log and the previous default browser are kept."""
+    return os.path.join(xdg_dir(env, "XDG_STATE_HOME", ".local/state"), "browser-selector")
+
+
+def path_which(env):
+    """which(program) on the PATH of env."""
+    import shutil  # not on the path of a click a rule decides with a which of its own
+    # An empty PATH is no PATH: shutil.which and execvp would find nothing at all.
+    return lambda program: shutil.which(program, path=env.get("PATH") or os.defpath)
+
+
 def config_path(env, option):
-    return (option or env.get("BROWSER_SELECTOR_CONFIG")
-            or os.path.join(xdg_dir(env, "XDG_CONFIG_HOME", ".config"), "browser-selector", "config.ini"))
+    return option or env.get("BROWSER_SELECTOR_CONFIG") or os.path.join(config_home(env), "browser-selector", "config.ini")
 
 
 def read_file(path, encoding="utf-8", errors="strict", newline=None):
@@ -82,13 +97,13 @@ def read_file(path, encoding="utf-8", errors="strict", newline=None):
         return file.read()
 
 
-def read_config(path):
+def read_config(path, errors="strict"):
     """Text of a config file: a line ends at a line feed, alone or after a carriage return.
 
     Nowhere else. Python would also end a line at a lone carriage return, and
     what is read back would not be what was validated before it was written.
     """
-    return read_file(path, "utf-8-sig", newline="").replace("\r\n", "\n")
+    return read_file(path, "utf-8-sig", errors, newline="").replace("\r\n", "\n")
 
 
 def printable(text):
@@ -100,7 +115,7 @@ def printable(text):
 def write_log(env, line):
     """Append one line to the log. Whatever goes wrong here, the click goes on."""
     try:
-        directory = os.path.join(xdg_dir(env, "XDG_STATE_HOME", ".local/state"), "browser-selector")
+        directory = state_dir(env)
         path = os.path.join(directory, "log")
         os.makedirs(directory, mode=0o700, exist_ok=True)
         os.chmod(directory, 0o700)
@@ -115,14 +130,19 @@ def write_log(env, line):
         pass
 
 
+def url_host(url):
+    """The host of a link, None when it has none or is no URL."""
+    try:
+        return urlsplit(url).hostname
+    except ValueError:
+        return None
+
+
 def url_origin(url):
     """Scheme and host only: everything else in a URL can carry a token."""
-    try:
-        parts = urlsplit(url)
-        host = parts.hostname
-    except ValueError:
-        return "-"
-    return "".join(f"{parts.scheme}://{host}".split()) if parts.scheme and host else "-"
+    host = url_host(url)
+    scheme = urlsplit(url).scheme if host else ""
+    return "".join(f"{scheme}://{host}".split()) if scheme else "-"
 
 
 def guard_is_fresh(env):
@@ -229,8 +249,9 @@ def read_window(env):
 
 def slack_workspace(env):
     """Name of the selected workspace of the Slack desktop app, or None."""
-    path = os.path.join(xdg_dir(env, "XDG_CONFIG_HOME", ".config"), "Slack", "storage", "root-state.json")
+    path = os.path.join(config_home(env), "Slack", "storage", "root-state.json")
     try:
+        import json
         state = json.loads(read_file(path))
         name = state["workspaces"][state["workspacesMeta"]["selectedWorkspaceId"]]["name"]
     except (OSError, ValueError, KeyError, TypeError):
@@ -286,11 +307,28 @@ def loops_back(argv, which):
     return None
 
 
+def unwritable(section, items):
+    """The error of a section with a line break or a control character in its name, a key or a value."""
+    if UNWRITABLE.search(section):
+        return f"[{section}]: the name has a line break or a control character"
+    for key, value in items.items():
+        # The line feed of a value that goes on in the next line is the one that may stay.
+        if UNWRITABLE.search(key + value.replace("\n", "")):
+            return f"[{section}] {key}: has a line break or a control character"
+    return None
+
+
+def section_key(section):
+    """(kind, name) of a section header, None when it is no kind of section this config knows."""
+    kind, _, name = section.partition(" ")
+    name = name.strip()
+    return (kind, name) if kind in KEYS and bool(name) != (kind == "settings") else None
+
+
 def parse_command(section, items, errors, which):
     command = items.get("command", "")
     if "\0" in command:
-        errors.append(f"[{section}] command: has a NUL byte")
-        return None
+        return None  # unwritable() names it; realpath and exec cannot take a NUL byte
     try:
         argv = shlex.split(command)
     except ValueError as error:
@@ -350,23 +388,26 @@ def parse_config(text, which=None):
     try:
         parser.read_string(text, source="config")
     except configparser.Error as error:
-        return None, [" ".join(str(error).split())]
+        return None, [one_line(str(error))]
 
     errors = []
     settings, browsers, shown, rules = {}, {}, {}, []
     seen = set()
     for section in parser.sections():
-        kind, _, name = section.partition(" ")
-        name = name.strip()
-        if kind not in KEYS or bool(name) == (kind == "settings"):
+        key = section_key(section)
+        if key is None:
             errors.append(f"[{section}]: unknown section")
             continue
-        if (kind, name) in seen:
+        if key in seen:
             # [rule x] and [rule  x]: two sections for configparser, one name here.
             errors.append(f"[{section}]: a second section of this name")
             continue
-        seen.add((kind, name))
+        seen.add(key)
+        kind, name = key
         items = dict(parser[section])
+        problem = unwritable(section, items)
+        if problem:
+            errors.append(problem)
         errors += [f"[{section}] {key}: unknown key" for key in items if key not in KEYS[kind]]
         if kind == "settings":
             settings = items
@@ -442,6 +483,31 @@ def build_command(argv, url):
     return argv + [url]
 
 
+def first_rule(config, url, apps, window, probe):
+    return next((rule for rule in config["rules"] if rule_matches(rule, url, apps, window, probe)), None)
+
+
+def chosen(config, rule):
+    """The browser a click goes to by the config: the one of the rule, else the default. May be `ask`."""
+    return rule["browser"] if rule else config["default"]
+
+
+def cached_probe(config, env, run_probe, note, probes):
+    """probe(command) for rule_matches: each probe runs once, its output is kept in `probes`.
+
+    A probe that breaks is a condition that is false: the next rule is tried.
+    """
+    def probe(command):
+        if command not in probes:
+            try:
+                probes[command] = run_probe(command, config["probe_timeout"], env)
+            except Exception as error:
+                note(f"probe {command}: {type(error).__name__}")
+                probes[command] = None
+        return probes[command]
+    return probe
+
+
 def commands(config, rule, url, which, note):
     """What to start, in the order to try: [(browser name or None, program path, argv)].
 
@@ -501,20 +567,12 @@ def decide(url, explain, config_file, env, cgroup_text, read_window, run_probe, 
                 windows.append(None)
         return windows[0]
 
-    def probe(command):
-        if command not in probes:
-            try:
-                probes[command] = run_probe(command, config["probe_timeout"], env)
-            except Exception as error:
-                note(f"probe {command}: {type(error).__name__}")
-                probes[command] = None
-        return probes[command]
-
+    probe = cached_probe(config, env, run_probe, note, probes)
     rule = None
     if explain:
         window()
     if config and url is not None:
-        rule = next((r for r in config["rules"] if rule_matches(r, url, apps, window, probe)), None)
+        rule = first_rule(config, url, apps, window, probe)
     elif config:
         # --explain without a URL has no rule to follow: show every probe.
         for r in config["rules"]:
@@ -524,7 +582,7 @@ def decide(url, explain, config_file, env, cgroup_text, read_window, run_probe, 
     return config, unit, apps, windows[0] if windows else None, probes, rule, found
 
 
-def print_explain(url, unit, apps, seen, probes, rule, found, asks=False):
+def print_explain(url, unit, apps, seen, probes, rule, found, asks):
     classes, title = seen or (["-"], "-")
     lines = [f"url: {url}"] if url is not None else []
     lines += [f"unit: {unit or '-'}", f"app: {', '.join(apps) or '-'}",
@@ -565,17 +623,17 @@ def read_model(text):
     model = empty_model()
     seen = set()
     for section in parser.sections():
-        kind, _, name = section.partition(" ")
-        name = name.strip()
-        known = (kind == "settings" and not name) or (kind in ("browser", "rule") and bool(name))
-        if not known or (kind, name) in seen:
+        key = section_key(section)
+        if key is None or key in seen:
             # Kept as it is, a second spelling of a name too: a save names it instead of dropping it.
             model["unknown"][section] = dict(parser[section])
-        elif kind == "settings":
+            continue
+        seen.add(key)
+        kind, name = key
+        if kind == "settings":
             model["settings"] = dict(parser[section])
         else:
             model[kind + "s"][name] = dict(parser[section])
-        seen.add((kind, name))
     return model
 
 
@@ -599,17 +657,14 @@ def render_model(model):
 def check_model(model, which=None):
     """The errors of a model, found by the code of --check. Empty when it can be written."""
     for section, items in model_sections(model):
-        if UNWRITABLE.search(section):
-            return [printable(f"[{section}]: the name has a line break or a control character")]
-        for key, value in items.items():
-            # The line feed of a value that goes on in the next line is the one that may stay.
-            if UNWRITABLE.search(key + value.replace("\n", "")):
-                return [printable(f"[{section}] {key}: has a line break or a control character")]
+        problem = unwritable(section, items)
+        if problem:
+            return [printable(problem)]
     text = render_model(model)
     try:
         written = read_model(text)
     except configparser.Error as error:
-        return [" ".join(str(error).split())]
+        return [one_line(str(error))]
     # What is read back must be what was written: a name with a line break in it would not be.
     for kind, label in (("browsers", "browser "), ("rules", "rule "), ("unknown", "")):
         for name, items in model[kind].items():
@@ -649,7 +704,7 @@ def load_model(path):
     except FileNotFoundError:
         return empty_model(), None
     except configparser.Error as error:
-        return None, " ".join(str(error).split())
+        return None, one_line(str(error))
     except Exception as error:
         return None, f"config: {type(error).__name__}: {error}"
 
@@ -872,12 +927,17 @@ def application_dirs(env):
     return list(dict.fromkeys(os.path.normpath(path) for path in dirs))
 
 
-def read_desktop_entry(path):
-    """The keys of the [Desktop Entry] group of a file, None when it cannot be read."""
+def read_desktop_entry(path, needs=None):
+    """The keys of the [Desktop Entry] group of a file, None when it cannot be read.
+
+    With `needs` a file without that text anywhere is not parsed and gives no keys.
+    """
     try:
         text = read_file(path, errors="replace", newline="")
     except OSError:
         return None
+    if needs and needs not in text:
+        return {}
     entry, inside = {}, False
     # As GLib reads it: a line ends at a line feed and nowhere else, the space around is ASCII.
     for line in text.split("\n"):
@@ -966,7 +1026,8 @@ def exec_argv(value):
 
 def desktop_browser(path, which, note):
     """A desktop entry that opens http links, as a browser to look for profiles of. Else None."""
-    entry = read_desktop_entry(path)
+    # Most of the entries of a system are no browser: those are not parsed at all.
+    entry = read_desktop_entry(path, needs="x-scheme-handler/http")
     if not entry or entry.get("Type", "Application") != "Application" or entry.get("Hidden") == "true":
         return None
     if "x-scheme-handler/http" not in entry.get("MimeType", "").split(";"):
@@ -994,6 +1055,7 @@ def chromium_profiles(places, note):
     """
     for place in places:
         try:
+            import json
             profile = json.loads(read_file(os.path.join(place, "Local State")))["profile"]
             cache = [(directory, info) for directory, info in profile["info_cache"].items() if isinstance(info, dict)]
         except (OSError, ValueError, KeyError, TypeError, AttributeError, RecursionError):
@@ -1023,8 +1085,7 @@ def firefox_profiles(places, note):
         parser = configparser.ConfigParser(interpolation=None, strict=False)
         parser.optionxform = str
         try:
-            text = read_file(os.path.join(place, "profiles.ini"), errors="replace", newline="")
-            parser.read_string(text.replace("\r\n", "\n"))
+            parser.read_string(read_config(os.path.join(place, "profiles.ini"), errors="replace"))
         except (OSError, configparser.Error):
             continue
         profiles = [parser[section] for section in parser.sections()
@@ -1069,7 +1130,7 @@ def browser_profiles(argv, snap, env, note):
         if flatpak == app:
             return family, chromium_profiles([os.path.join(home, ".var", "app", app, "config", directory)], note)
         if flatpak is None and name in programs:
-            places = [os.path.join(xdg_dir(env, "XDG_CONFIG_HOME", ".config"), directory)]
+            places = [os.path.join(config_home(env), directory)]
             places += [os.path.join(home, snap_directory)] if snap_directory else []
             return family, chromium_profiles(places[::-1] if snap else places, note)
     if flatpak == FIREFOX_FLATPAK:
@@ -1150,7 +1211,7 @@ def system_default(env, run=subprocess.run):
 
 
 def previous_default_file(env):
-    return os.path.join(xdg_dir(env, "XDG_STATE_HOME", ".local/state"), "browser-selector", "previous-default")
+    return os.path.join(state_dir(env), "previous-default")
 
 
 def previous_default(env):
@@ -1166,7 +1227,7 @@ def make_default(env, run=subprocess.run):
     """Make the handler the default browser, as install.sh --set-default does. An error or None."""
     current = system_default(env, run)
     if xdg_settings(env, "set", "default-web-browser", ENTRY, run=run) is None:
-        entry = read_desktop_entry(os.path.join(xdg_dir(env, "XDG_DATA_HOME", ".local/share"), "applications", ENTRY))
+        entry = read_desktop_entry(os.path.join(application_dirs(env)[0], ENTRY))
         # xdg-settings takes the first word of Exec for the program, the quote of a quoted path included.
         why = f": {QUOTED_ENTRY}" if entry and entry.get("Exec", "").startswith('"') else ""
         return f"xdg-settings could not make {ENTRY} the default browser{why}"
@@ -1215,6 +1276,10 @@ def load_windows():
     directory = os.path.dirname(HANDLER)
     if directory not in sys.path:
         sys.path.insert(0, directory)
+    if sys.flags.no_site:
+        # The packaged launcher skips site to start faster: PyGObject is in a directory site adds.
+        import site
+        site.main()
     # The handler runs as __main__. The windows import it by name and must get this very module.
     sys.modules.setdefault("browser_selector", sys.modules[__name__])
     import browser_selector_gui
@@ -1228,11 +1293,7 @@ def need_display(env):
 
 def link_label(url):
     """What the picker shows of a link: the host, or the link itself when it has none."""
-    try:
-        host = urlsplit(url).hostname
-    except ValueError:
-        host = None
-    return printable(host or url)
+    return printable(url_host(url) or url)
 
 
 def in_child(function):
@@ -1243,6 +1304,7 @@ def in_child(function):
     """
     # A handler started with a closed stdout or stderr: the pipe would become fd 1 or 2, and the
     # first warning GTK writes there would be read as the answer. /dev/null takes the free ones.
+    import json
     spare = os.open(os.devnull, os.O_RDWR)
     while spare < 3:
         spare = os.open(os.devnull, os.O_RDWR)
@@ -1299,28 +1361,19 @@ def try_click(config, url, apps, seen, env, which, run_probe=run_probe):
     is None for no window. The probes run for real. Rule name and argv are
     None when there is none, the browser is `ask` for the picker.
     """
-    notes, probes = [], {}
-
-    def probe(command):
-        if command not in probes:
-            try:
-                probes[command] = run_probe(command, config["probe_timeout"], env)
-            except Exception as error:
-                notes.append(f"probe {command}: {type(error).__name__}")
-                probes[command] = None
-        return probes[command]
-
-    rule = next((r for r in config["rules"] if rule_matches(r, url, apps, lambda: seen, probe)), None)
+    notes = []
+    probe = cached_probe(config, env, run_probe, notes.append, {})
+    rule = first_rule(config, url, apps, lambda: seen, probe)
     found = commands(config, rule, url, which, notes.append)
     name, _, argv = found[0] if found else (None, None, None)
-    if (rule["browser"] if rule else config["default"]) == ASK:
+    if chosen(config, rule) == ASK:
         name, argv = ASK, None
     return rule["name"] if rule else None, name, argv, notes
 
 
 def log_tail(env, count=200):
     """The last lines of the decision log, the oldest first. Empty when there is no log."""
-    directory = os.path.join(xdg_dir(env, "XDG_STATE_HOME", ".local/state"), "browser-selector")
+    directory = state_dir(env)
     lines = []
     for name in ("log.1", "log"):
         try:
@@ -1346,9 +1399,11 @@ def parse_args(argv):
             raise ValueError(f"not a URL: {arg!r}")
         else:
             urls.append(arg)
-    least, most = {"open": (1, 1), "explain": (0, 1)}.get(mode, (0, 0))
-    if not least <= len(urls) <= most:
-        raise ValueError("one URL is expected" if least else "too many arguments")
+    if len(urls) > (mode in ("open", "explain")):
+        raise ValueError("too many arguments")
+    if mode == "open" and not urls:
+        # The icon in the app grid starts the handler without a URL.
+        mode = "settings"
     return mode, option, urls[0] if urls else None
 
 
@@ -1357,8 +1412,8 @@ def main(argv=None, env=None, cgroup_text=None, read_window=read_window, run_pro
     """Everything external comes in as an argument, the tests replace it."""
     argv = sys.argv[1:] if argv is None else argv
     env = os.environ if env is None else env
-    # An empty PATH is no PATH: shutil.which and execvp would find nothing at all.
-    which = which or (lambda program: shutil.which(program, path=env.get("PATH") or os.defpath))
+    # A click looks the same programs up several times: once each is enough.
+    which = which or functools.lru_cache(maxsize=None)(path_which(env))
 
     try:
         mode, option, url = parse_args(argv)
@@ -1431,7 +1486,7 @@ def main(argv=None, env=None, cgroup_text=None, read_window=read_window, run_pro
         note(f"{type(error).__name__} before the browser was chosen: last resort")
         config, unit, apps, seen, probes, rule = None, None, [], None, {}, None
         found = commands(None, None, url, which, note) if url is not None else []
-    asks = bool(config) and url is not None and (rule["browser"] if rule else config["default"]) == ASK
+    asks = bool(config) and url is not None and chosen(config, rule) == ASK
 
     if explain:
         print_explain(url, unit, apps, seen, probes, rule, found, asks)

@@ -1,6 +1,7 @@
 """Config: every error the contract lists, with its section and key."""
 
 import os
+import shutil
 import re
 import unittest
 
@@ -158,6 +159,24 @@ class Validation(unittest.TestCase):
         self.assertFalse(rule["probe_match"].flags & re.IGNORECASE)
 
 
+class ControlCharacters(unittest.TestCase):
+    """--check refuses what a save would refuse: a control character in a name, a key or a value."""
+
+    def errors(self, text):
+        return bs.parse_config("[settings]\ndefault = main\n\n" + text)[1]
+
+    def test_in_a_value(self):
+        self.assertEqual(self.errors("[browser main]\nname = a\x1bb\ncommand = firefox\n"),
+                         ["[browser main] name: has a line break or a control character"])
+
+    def test_in_a_command(self):
+        self.assertEqual(self.errors("[browser main]\ncommand = firefox \x01\n"),
+                         ["[browser main] command: has a line break or a control character"])
+
+    def test_a_tab_and_a_continuation_line_are_fine(self):
+        self.assertEqual(self.errors("[browser main]\nname = a\tb\ncommand = firefox\n\t--new-window\n"), [])
+
+
 class HandlerItself(HandlerCase):
     """A command that resolves to the handler under another name."""
 
@@ -189,7 +208,7 @@ class HandlerItself(HandlerCase):
     def test_check_with_the_real_which(self):
         path = self.write_config(self.text.format("my-browser"))
         env = {"HOME": self.home, "PATH": os.path.dirname(self.link)}
-        errors = bs.load_config(path, lambda program: bs.shutil.which(program, path=env["PATH"]))[1]
+        errors = bs.load_config(path, lambda program: shutil.which(program, path=env["PATH"]))[1]
         self.assertTrue(errors and errors[0].startswith("[browser main] command: "), errors)
 
 
@@ -384,15 +403,14 @@ class DesktopEntry(unittest.TestCase):
         self.assertIn("MimeType=x-scheme-handler/unknown;x-scheme-handler/about;text/html;"
                       "x-scheme-handler/http;x-scheme-handler/https;", lines)
         self.assertIn("Exec=@BIN@ %u", lines)
-        self.assertIn("NoDisplay=true", lines)
 
-    def test_the_settings_entry_is_no_browser(self):
-        # It is shown in the app grid, and discovery of another tool must not take it for a browser
-        lines = read(os.path.join(ROOT, "browser-selector-settings.desktop")).splitlines()
-        self.assertIn("Exec=@BIN@ --settings", lines)
-        self.assertFalse([line for line in lines if line.startswith(("MimeType", "NoDisplay"))])
-        self.assertEqual({os.path.basename(name) for name in os.listdir(ROOT) if name.endswith(".desktop")},
-                         bs.OWN_ENTRIES)
+    def test_one_entry_is_the_browser_and_the_icon(self):
+        # Shown in the app grid: started from there it gets no URL and opens the settings window
+        lines = read(os.path.join(ROOT, "browser-selector.desktop")).splitlines()
+        self.assertFalse([line for line in lines if line.startswith("NoDisplay")])
+        self.assertIn("StartupWMClass=browser-selector", lines)
+        self.assertEqual([name for name in os.listdir(ROOT) if name.endswith(".desktop")], [bs.ENTRY])
+        self.assertIn(bs.ENTRY, bs.OWN_ENTRIES)
 
 
 if __name__ == "__main__":

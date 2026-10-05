@@ -9,7 +9,7 @@ set -eu
 boot_home
 
 LIB="$XDG_DATA_HOME/browser-selector"
-SETTINGS_ENTRY="$XDG_DATA_HOME/applications/browser-selector-settings.desktop"
+OLD_ENTRY="$XDG_DATA_HOME/applications/browser-selector-settings.desktop"
 PREVIOUS="$XDG_STATE_HOME/browser-selector/previous-default"
 
 # run LOG COMMAND...: output to $OUT_DIR/LOG, exit code in RC
@@ -39,14 +39,11 @@ expect_true "the rest is the handler of the checkout" \
     cmp -s <(tail -n +2 "$REPO_DIR/browser_selector.py") <(tail -n +2 "$LIB/browser_selector.py")
 expect_true "the windows are the ones of the checkout" \
     cmp -s "$REPO_DIR/browser_selector_gui.py" "$LIB/browser_selector_gui.py"
-expect_true "the two desktop entries are in the applications dir" test -f "$DESKTOP_ENTRY" -a -f "$SETTINGS_ENTRY"
-grep -H '^Exec=' "$DESKTOP_ENTRY" "$SETTINGS_ENTRY" 2>/dev/null | sed 's/^.*applications\//     /' || true
+expect_true "the desktop entry is in the applications dir" test -f "$DESKTOP_ENTRY"
+expect_false "there is no second entry for the settings" test -e "$OLD_ENTRY"
 expect_equal "Exec of the handler has the absolute path" \
     "Exec=$HANDLER %u" "$(grep '^Exec=' "$DESKTOP_ENTRY" 2>/dev/null)"
-expect_equal "Exec of the settings entry opens the window" "Exec=$HANDLER --settings" \
-    "$(grep '^Exec=' "$SETTINGS_ENTRY" 2>/dev/null)"
-expect_true "the handler is hidden from the app grid" grep -qx "NoDisplay=true" "$DESKTOP_ENTRY"
-expect_false "the settings entry is shown there" grep -q "NoDisplay" "$SETTINGS_ENTRY"
+expect_false "the entry is shown in the app grid" grep -q "NoDisplay" "$DESKTOP_ENTRY"
 expect_true "the handler runs: --version" "$HANDLER" --version
 expect_equal "the default browser is not changed" firefox.desktop "$(default_browser)"
 expect_false "no previous default is recorded" test -e "$PREVIOUS"
@@ -124,7 +121,7 @@ expect_equal "the previous default browser is back" firefox.desktop "$(default_b
 expect_equal "also for gio" firefox.desktop "$(gio_default)"
 expect_false "the link in ~/.local/bin is gone" test -e "$HANDLER" -o -L "$HANDLER"
 expect_false "the data directory is gone" test -e "$LIB"
-expect_false "the two desktop entries are gone" test -e "$DESKTOP_ENTRY" -o -e "$SETTINGS_ENTRY"
+expect_false "the desktop entry is gone" test -e "$DESKTOP_ENTRY"
 expect_true "the config is left" cmp -s "$STAND/config.mine" "$CONFIG"
 expect_true "the log is left, and uninstall.sh says so" grep -qF "Kept:    $HANDLER_LOG" "$OUT_DIR/uninstall-1.log"
 expect_true "it is still there" test -s "$HANDLER_LOG"
@@ -151,7 +148,7 @@ run uninstall-3.log bash "$REPO_DIR/uninstall.sh"
 expect_equal "uninstall.sh refuses with a non-zero exit code" 1 "$RC"
 expect_true "nothing is removed: the handler, the windows, the entries" \
     test -L "$HANDLER" -a -f "$LIB/browser_selector.py" -a -f "$LIB/browser_selector_gui.py" \
-    -a -f "$DESKTOP_ENTRY" -a -f "$SETTINGS_ENTRY"
+    -a -f "$DESKTOP_ENTRY"
 expect_equal "the handler is still the default browser" browser-selector.desktop "$(default_browser)"
 before="$(launches)"
 xdg-open https://example.com/still-there
@@ -159,7 +156,7 @@ wait_launch $((before + 1))
 expect_launch "and a link still opens" brave-browser "--profile-directory=Profile 1" https://example.com/still-there
 run uninstall-4.log bash "$REPO_DIR/uninstall.sh" --force
 expect_equal "uninstall.sh --force exits with 0" 0 "$RC"
-expect_false "and removes it all" test -e "$HANDLER" -o -e "$LIB" -o -e "$DESKTOP_ENTRY" -o -e "$SETTINGS_ENTRY"
+expect_false "and removes it all" test -e "$HANDLER" -o -e "$LIB" -o -e "$DESKTOP_ENTRY" -o -e "$OLD_ENTRY"
 expect_true "but not the config" cmp -s "$STAND/config.mine" "$CONFIG"
 xdg-settings set default-web-browser firefox.desktop
 
@@ -171,7 +168,7 @@ chmod +x "$HANDLER"
 run uninstall-5.log bash "$REPO_DIR/uninstall.sh"
 expect_equal "uninstall.sh exits with 0" 0 "$RC"
 expect_equal "the file is left alone" mine "$("$HANDLER")"
-expect_false "the rest is removed" test -e "$LIB" -o -e "$DESKTOP_ENTRY" -o -e "$SETTINGS_ENTRY"
+expect_false "the rest is removed" test -e "$LIB" -o -e "$DESKTOP_ENTRY" -o -e "$OLD_ENTRY"
 run install-8.log bash "$REPO_DIR/install.sh"
 expect_equal "install.sh over a handler of the first layout exits with 0" 0 "$RC"
 expect_equal "and puts the link in its place" "$LIB/browser_selector.py" "$(readlink "$HANDLER" 2>/dev/null)"

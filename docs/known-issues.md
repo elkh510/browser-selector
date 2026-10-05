@@ -1,6 +1,6 @@
 # Known issues
 
-_verified: 2026-10-02_
+_verified: 2026-10-05_
 
 Open problems, limits and things nobody has checked yet. Each with what removes it. A line
 goes away when the thing is fixed or confirmed.
@@ -27,6 +27,8 @@ goes away when the thing is fixed or confirmed.
 | Units of D-Bus activated applications (`dbus-:1.2-org.gnome.Nautilus@0.service`) do not give the app id | not normalised | a case for it in the app id code, after seeing the real names |
 | The settings window saves a form over a hand edit of the same section made while the form was open, and two settings windows do not lock each other | the file is re-read before a change, not while a form is open | not planned |
 | Comments in a hand edited config are lost on the first save from the window | the file is rewritten from the model | not planned |
+| After a release upgrade the bytecode of the package is of the old Python and every click compiles again | `postinst` compiles once | `sudo dpkg-reconfigure browser-selector`; a dpkg trigger on the interpreter |
+| The "launch web browser" key of GNOME opens the settings window, not a browser | one desktop entry: a start without a URL is the settings window | start the default browser of the config there and move the settings to a desktop action |
 
 ## Not covered by a stand
 

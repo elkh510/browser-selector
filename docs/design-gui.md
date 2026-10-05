@@ -1,6 +1,6 @@
 # Design: discovery, picker, settings window
 
-_verified: 2026-10-02_
+_verified: 2026-10-05_
 
 The second part of the contract, on top of [design.md](design.md). The shape
 is taken from Browser Tamer: the tool is the default browser, and inside it
@@ -12,8 +12,7 @@ The handler stays what it is: a click that a rule decides never loads GTK.
 
     browser_selector.py        the handler and everything without a window
     browser_selector_gui.py    picker and settings window, GTK 4 + libadwaita
-    browser-selector.desktop            the handler, hidden from the app grid
-    browser-selector-settings.desktop   the settings window, shown in the app grid
+    browser-selector.desktop   the handler and the icon in the app grid
 
 `browser_selector_gui.py` is imported by the handler only when a window is
 needed. It may use only API that exists in GTK 4.6 and libadwaita 1.1 (Ubuntu
@@ -84,7 +83,15 @@ window that dies ends in the last resort as well.
 
 ## Settings window
 
+    browser-selector            # no URL: what the icon in the app grid runs
     browser-selector --settings
+
+There is one desktop entry, as a browser has: `Exec=... %u` gets the URL of a
+click and nothing from the app grid, and a start without a URL is the settings
+window. The price: whatever asks the default browser to start without a URL
+(the "launch web browser" key of GNOME) opens the settings, not a browser.
+`install.sh` and `uninstall.sh` remove the `browser-selector-settings.desktop`
+that the installs before 0.3.0 had.
 
 Pages:
 
@@ -113,13 +120,40 @@ is written to a temporary file and renamed over the old one, a new one with
 mode 0600. Comments in a hand edited config are lost on the first save, the
 README says so.
 
+## Package
+
+    bash packaging/build-deb.sh     # dist/browser-selector_<version>_all.deb
+    sudo apt install ./dist/browser-selector_<version>_all.deb
+
+Built in a container (Ubuntu 22.04, `dpkg-deb`), then installed, started and
+removed there. The version is `VERSION` of `browser_selector.py`, nothing
+else carries one. Not a compiled binary: a frozen Python starts slower than
+the interpreter, and most of a click is the interpreter itself.
+
+    /usr/lib/browser-selector/browser_selector.py, browser_selector_gui.py
+    /usr/lib/browser-selector/browser-selector    packaging/launcher
+    /usr/bin/browser-selector                     symlink to the launcher
+    /usr/share/applications/browser-selector.desktop
+
+The launcher imports the handler, so Python reads the bytecode `postinst`
+compiled, and runs with `-IS`: no `site`. `load_windows` runs `site.main()`
+when a window is needed, PyGObject is in a directory `site` adds. Measured on
+Ubuntu 22.04, median of 60 starts of `--version`: 30 ms as the script of
+`install.sh`, 21 ms as the package, 9 ms for an empty Python.
+
+The package has no per user step: the config comes from
+`browser-selector --init-config` or "Find browsers" in the settings window,
+the default browser from the Default page. An install by `install.sh` shadows
+the package (`~/.local/bin`, `~/.local/share/applications`): `uninstall.sh`
+first.
+
 ## Install
 
     browser_selector.py, browser_selector_gui.py
                                -> ${XDG_DATA_HOME:-~/.local/share}/browser-selector/
     ~/.local/bin/browser-selector
                                -> symlink to browser_selector.py there
-    browser-selector.desktop, browser-selector-settings.desktop
+    browser-selector.desktop
                                -> ${XDG_DATA_HOME:-~/.local/share}/applications/
     config                     written from discovery when there is none
                                (`--init-config`): every browser found,

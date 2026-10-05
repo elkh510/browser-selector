@@ -1,0 +1,14 @@
+#!/usr/bin/python3 -IS
+# What /usr/bin/browser-selector of the package points at. The handler is
+# imported, not run as a script, so Python takes the bytecode the package
+# compiled at install time: about a third off the start of every click.
+import os
+import sys
+
+HERE = os.path.realpath(__file__)
+sys.path.insert(0, os.path.dirname(HERE))
+
+import browser_selector
+
+browser_selector.HANDLER = HERE
+sys.exit(browser_selector.main())

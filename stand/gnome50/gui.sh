@@ -40,7 +40,7 @@ start_gui() {
 # of the handler under
 wait_app_known() {
     for _ in $(seq 1 100); do
-        [ "$(shell eval "!!imports.gi.Shell.AppSystem.get_default().lookup_app('browser-selector-settings.desktop')")" = true ] && return 0
+        [ "$(shell eval "!!imports.gi.Shell.AppSystem.get_default().lookup_app('browser-selector.desktop')")" = true ] && return 0
         sleep 0.1
     done
     return 1

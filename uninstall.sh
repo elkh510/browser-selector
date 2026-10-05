@@ -13,7 +13,8 @@ for variable in XDG_DATA_HOME XDG_CONFIG_HOME XDG_STATE_HOME; do
 done
 
 entry=browser-selector.desktop
-settings_entry=browser-selector-settings.desktop
+# The settings entry of the installs before 0.3.0: removed when it is found.
+old_entry=browser-selector-settings.desktop
 data="${XDG_DATA_HOME:-$HOME/.local/share}"
 lib="$data/browser-selector"
 apps="$data/applications"
@@ -40,7 +41,7 @@ fi
 # The browser to go back to, by the test the handler has for it: the plain
 # name of a desktop entry, and not one of the two that are removed here.
 previous=$(cat "$state/previous-default" 2>/dev/null || true)
-if [[ ! $previous =~ ^[[:alnum:]_.+-]+\.desktop$ || $previous == "$entry" || $previous == "$settings_entry" ]]; then
+if [[ ! $previous =~ ^[[:alnum:]_.+-]+\.desktop$ || $previous == "$entry" || $previous == "$old_entry" ]]; then
     previous=
 fi
 
@@ -79,7 +80,7 @@ if [[ -L $bin && $(readlink "$bin") == "$lib/browser_selector.py" ]]; then
 elif [[ -e $bin || -L $bin ]]; then
     echo "Left:    $bin (not the link install.sh makes)"
 fi
-for file in "$apps/$entry" "$apps/$settings_entry" "$lib/browser_selector.py" "$lib/browser_selector_gui.py" \
+for file in "$apps/$entry" "$apps/$old_entry" "$lib/browser_selector.py" "$lib/browser_selector_gui.py" \
         "$state/previous-default"; do
     if [[ -f $file || -L $file ]]; then
         rm -f "$file"

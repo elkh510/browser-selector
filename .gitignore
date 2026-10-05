@@ -430,3 +430,4 @@ FodyWeavers.xsd
 
 # The desktop of the user: real names, the real config
 local/
+dist/
