@@ -12,7 +12,7 @@ for variable in XDG_DATA_HOME XDG_CONFIG_HOME XDG_STATE_HOME; do
 done
 
 entry=browser-selector.desktop
-# The settings entry of the installs before 0.3.0: removed when it is found.
+# The settings entry older installs had: removed when it is found.
 old_entry=browser-selector-settings.desktop
 data="${XDG_DATA_HOME:-$HOME/.local/share}"
 lib="$data/browser-selector"

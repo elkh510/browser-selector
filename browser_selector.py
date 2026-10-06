@@ -21,7 +21,8 @@ import sys
 import time
 from urllib.parse import urlsplit
 
-VERSION = "0.3.0"
+# What a checkout reports. A package carries the version of its release, the build writes it here.
+VERSION = "0.0.0"
 USAGE = """\
 usage: browser-selector [--config PATH] URL
        browser-selector [--config PATH] [--settings]
@@ -56,7 +57,7 @@ ASK = "ask"
 # and GLib know more than the line feed), every control character but the tab, a lone surrogate.
 UNWRITABLE = re.compile("[\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]")
 ENTRY = "browser-selector.desktop"
-# The second one is the settings entry of the installs before 0.3.0.
+# The second one is the settings entry older installs had.
 OWN_ENTRIES = {ENTRY, "browser-selector-settings.desktop"}
 REGEX_FLAGS = {"app": re.IGNORECASE, "window": re.IGNORECASE, "title": 0, "url": 0,
                "probe_match": re.MULTILINE}

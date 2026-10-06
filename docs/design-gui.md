@@ -91,7 +91,7 @@ click and nothing from the app grid, and a start without a URL is the settings
 window. The price: whatever asks the default browser to start without a URL
 (the "launch web browser" key of GNOME) opens the settings, not a browser.
 `install.sh` and `uninstall.sh` remove the `browser-selector-settings.desktop`
-that the installs before 0.3.0 had.
+that older installs had.
 
 Pages:
 
@@ -126,14 +126,26 @@ README says so.
     sudo apt install ./dist/browser-selector_<version>_all.deb
 
 Built in a container (Ubuntu 22.04, `dpkg-deb`), then installed, started and
-removed there. The version is `VERSION` of `browser_selector.py`, nothing
-else carries one. Not a compiled binary: a frozen Python starts slower than
+removed there. The version is `$VERSION`, or `VERSION` of `browser_selector.py`
+when that is not set. Not a compiled binary: a frozen Python starts slower than
 the interpreter, and most of a click is the interpreter itself.
 
     /usr/lib/browser-selector/browser_selector.py, browser_selector_gui.py
     /usr/lib/browser-selector/browser-selector    packaging/launcher
     /usr/bin/browser-selector                     symlink to the launcher
     /usr/share/applications/browser-selector.desktop
+
+A release needs no hand: every push to `main` that touches more than `docs/`,
+`stand/` and `.github/` runs `.github/workflows/release.yaml`: unit tests, the
+package, a tag and a GitHub release with the package attached. The tags are
+the only place a version lives: the next one is the minor after the latest
+`X.Y.Z` tag, with `0.0.0` standing for no tag, so the first release is `0.1.0`
+and the next `0.2.0`. A major release is a tag pushed by hand, the count goes
+on from it. `VERSION` of the code stays
+`0.0.0`, which is what a checkout reports; the build stamps the version into
+the packaged handler (`VERSION=1.2.3 bash packaging/build-deb.sh` does the
+same by hand). A pull request gets the
+package as an artifact with the version `X.Y.Z~<sha>`, and no release.
 
 The launcher imports the handler, so Python reads the bytecode `postinst`
 compiled, and runs with `-IS`: no `site`. `load_windows` runs `site.main()`

@@ -3,8 +3,10 @@
 set -euo pipefail
 
 owner=$1
-version=$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' /src/browser_selector.py)
-[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "inner.sh: no VERSION in browser_selector.py" >&2; exit 1; }
+# The version: $VERSION when the caller gives one (CI counts it from the tags),
+# else VERSION of the code. The packaged handler reports what the package is.
+version=${VERSION:-$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' /src/browser_selector.py)}
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(~[0-9a-z]+)?$ ]] || { echo "inner.sh: not a version: '$version'" >&2; exit 1; }
 
 root=$(mktemp -d)
 chmod 755 "$root"
@@ -12,6 +14,7 @@ lib=$root/usr/lib/browser-selector
 install -d "$root/DEBIAN" "$lib" "$root/usr/bin" "$root/usr/share/applications" \
     "$root/usr/share/doc/browser-selector"
 install -m 644 /src/browser_selector.py /src/browser_selector_gui.py "$lib/"
+sed -i "s/^VERSION = \".*\"$/VERSION = \"$version\"/" "$lib/browser_selector.py"
 install -m 755 /src/packaging/launcher "$lib/browser-selector"
 ln -s ../lib/browser-selector/browser-selector "$root/usr/bin/browser-selector"
 sed 's|@BIN@|/usr/bin/browser-selector|' /src/browser-selector.desktop \
