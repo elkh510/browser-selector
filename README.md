@@ -14,6 +14,38 @@ Built for Ubuntu with GNOME: 22.04 (GNOME 42, X11) and 26.04 (GNOME 50,
 Wayland). Python 3.10 or newer, GTK 4 and libadwaita for the windows, all of
 it already on a stock Ubuntu desktop. No daemon, no GNOME Shell extension.
 
+![The rules page of the settings window](docs/images/settings-rules.png)
+
+## How it works
+
+```mermaid
+flowchart LR
+    click["A link is clicked<br>in Slack, VS Code, a VPN client ..."] --> handler["browser-selector<br>the default browser"]
+    handler --> facts["What it reads<br>app of the click<br>focused window: class, title<br>the URL<br>output of a probe command"]
+    facts --> rules{"Rules, top down:<br>the first match decides"}
+    rules -- "a rule names a browser" --> open["That browser and profile"]
+    rules -- "a rule says ask" --> picker["Picker window"]
+    picker --> open
+    rules -- "no rule matches" --> fallback["The default browser of the config"]
+```
+
+1. The system starts `browser-selector URL`, because it is the default web
+   browser.
+2. The handler finds the app the click came from (its cgroup unit), the
+   focused window, and runs the probes the rules ask for.
+3. The first rule whose conditions all match names a browser and profile, and
+   the handler becomes that browser: it does not stay running. About 20 ms
+   from the package, there is no daemon.
+4. Anything that goes wrong (a broken config, a browser that is gone) ends in
+   the default browser of the config, then in the first browser found.
+
+Started without a link, from the app grid, it shows the settings window.
+
+| | |
+|---|---|
+| ![Browsers](docs/images/settings-browsers.png) Browsers and profiles, found on the machine or added by hand | ![New rule](docs/images/settings-rule-form.png) A rule: every field that is filled in has to match |
+| ![Test](docs/images/settings-test.png) Test: what a click would open, and by which rule | ![Picker](docs/images/picker.png) The picker, for a rule with `browser = ask`: a digit or Enter chooses |
+
 ## Install
 
     bash packaging/build-deb.sh     # a package: dist/browser-selector_<version>_all.deb
