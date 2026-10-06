@@ -1,0 +1,18 @@
+#!/bin/bash
+# Fake netbird: `netbird profile list` prints the table of the real client.
+# The active profile is the one named in $STAND/netbird.active, every call
+# leaves a line in $OUT_DIR/probe.log.
+printf 'netbird %s\n' "$*" >>"${OUT_DIR:-/tmp}/probe.log"
+
+if [ "${1:-} ${2:-}" != "profile list" ]; then
+    echo "fake netbird: only 'profile list' is implemented" >&2
+    exit 1
+fi
+
+active="$(cat "${STAND:-/tmp}/netbird.active" 2>/dev/null || echo default)"
+printf 'NAME     ACTIVE\n'
+for profile in default globex; do
+    mark=""
+    [ "$profile" = "$active" ] && mark="✓"
+    printf '%-8s %s\n' "$profile" "$mark"
+done

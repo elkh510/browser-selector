@@ -1,0 +1,17 @@
+{
+ "profile": {
+  "info_cache": {
+   "Default": {
+    "name": "Not the flatpak",
+    "is_using_default_name": false,
+    "avatar_icon": "x"
+   }
+  },
+  "profiles_order": [
+   "Default"
+  ]
+ },
+ "browser": {
+  "enabled_labs_experiments": []
+ }
+}

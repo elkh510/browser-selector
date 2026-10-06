@@ -1,0 +1,30 @@
+{
+ "profile": {
+  "info_cache": {
+   "Profile 15": {
+    "name": "acme",
+    "is_using_default_name": false,
+    "avatar_icon": "x"
+   },
+   "Profile 6": {
+    "name": "main",
+    "is_using_default_name": false,
+    "avatar_icon": "x"
+   },
+   "Profile 9": {
+    "name": "Side",
+    "is_using_default_name": false,
+    "avatar_icon": "x"
+   }
+  },
+  "profiles_order": [
+   "Profile 15",
+   "Profile 6",
+   "Profile 9"
+  ],
+  "last_used": "Profile 15"
+ },
+ "browser": {
+  "enabled_labs_experiments": []
+ }
+}

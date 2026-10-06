@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Files
+Name[ru]=Браузер
+GenericName=Web Browser
+Exec=nautilus --new-window %U
+Terminal=false
+Icon=org.gnome.Nautilus
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=inode/directory;

@@ -1,0 +1,62 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - .github/**
+      - docs/**
+      - stand/**
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  deb:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Unit tests
+        run: /usr/bin/python3 -m unittest discover -s tests
+
+      - name: Next version
+        id: version
+        shell: bash
+        run: |
+          # The minor after the latest tag, and 0.0.0 stands for no tag: the first
+          # release is 0.1.0. A major release is a tag pushed by hand: the count
+          # goes on from it.
+          git fetch --prune --tags
+          latest=$(git tag -l | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort --version-sort | tail -n 1 || true)
+          next=$(echo "${latest:-0.0.0}" | awk 'BEGIN{FS=OFS="."} {$2+=1; $3=0} 1')
+          if [[ $GITHUB_REF != refs/heads/main ]]; then
+              next="$next~${GITHUB_SHA::7}"
+          fi
+          echo "latest tag: ${latest:-none}, building: $next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Build the package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash packaging/build-deb.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: dist/*.deb
+          if-no-files-found: error
+
+      - name: Tag and release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: gh release create "$VERSION" dist/*.deb --target "$GITHUB_SHA" --title "$VERSION" --generate-notes
