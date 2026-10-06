@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
     paths-ignore:
       - .github/**
       - docs/**
@@ -37,9 +39,17 @@ jobs:
           git fetch --prune --tags
           latest=$(git tag -l | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort --version-sort | tail -n 1 || true)
           next=$(echo "${latest:-0.0.0}" | awk 'BEGIN{FS=OFS="."} {$2+=1; $3=0} 1')
-          if [[ $GITHUB_REF != refs/heads/main ]]; then
+          release=false
+          if [[ $GITHUB_REF =~ ^refs/tags/[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              # A tag pushed by hand, or the workflow started on one: that version.
+              next=$GITHUB_REF_NAME
+              release=true
+          elif [[ $GITHUB_EVENT_NAME == push && $GITHUB_REF == refs/heads/main ]]; then
+              release=true
+          else
               next="$next~${GITHUB_SHA::7}"
           fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "latest tag: ${latest:-none}, building: $next"
           echo "version=$next" >> "$GITHUB_OUTPUT"
 
@@ -55,7 +65,7 @@ jobs:
           if-no-files-found: error
 
       - name: Tag and release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}

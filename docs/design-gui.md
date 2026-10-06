@@ -140,8 +140,8 @@ A release needs no hand: every push to `main` that touches more than `docs/`,
 package, a tag and a GitHub release with the package attached. The tags are
 the only place a version lives: the next one is the minor after the latest
 `X.Y.Z` tag, with `0.0.0` standing for no tag, so the first release is `0.1.0`
-and the next `0.2.0`. A major release is a tag pushed by hand, the count goes
-on from it. `VERSION` of the code stays
+and the next `0.2.0`. A major release is a tag pushed by hand: the same workflow
+builds and releases that version, and the count goes on from it. `VERSION` of the code stays
 `0.0.0`, which is what a checkout reports; the build stamps the version into
 the packaged handler (`VERSION=1.2.3 bash packaging/build-deb.sh` does the
 same by hand). A pull request gets the
