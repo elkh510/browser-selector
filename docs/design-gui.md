@@ -1,6 +1,6 @@
 # Design: discovery, picker, settings window
 
-_verified: 2026-10-05_
+_verified: 2026-10-07_
 
 The second part of the contract, on top of [design.md](design.md). The shape
 is taken from Browser Tamer: the tool is the default browser, and inside it
@@ -104,11 +104,16 @@ Pages:
 * Default: the browser for everything else, "Ask every time" included;
 * Test: URL, app, window class and title typed in by hand, the answer is the
   rule that fires and the command, by the same code the handler uses;
-* Recent: the last lines of the decision log, read only. This is where the
-  app id of a new application is looked up when writing a rule for it;
-* a status row: whether the handler is the default browser of the system,
-  with a button for the switch and for the way back. Nothing is switched
-  without that button.
+* Logs: the last lines of the decision log, read only. The Live button turns
+  the page into the live log, see design.md: every link clicked from then on
+  with all a rule can match, the newest first, read from the live file every
+  300 ms. This is where the app id, the window class and the title of a new
+  application are looked up when writing a rule for it. Leaving the page or
+  closing the window releases the button and removes the file;
+* a status row: whether the handler is the default browser of the system, and
+  "Set as default", which is active only when it is not. Nothing is switched
+  without that button, and the way back is the settings of the desktop or
+  `uninstall.sh`.
 
 Every change is saved at once, there is no Save for the whole window. The
 file is read again before each change, a hand edit made meanwhile is kept.

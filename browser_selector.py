@@ -533,7 +533,7 @@ def commands(config, rule, url, which, note):
     return found
 
 
-def decide(url, explain, config_file, env, cgroup_text, read_window, run_probe, which, note):
+def decide(url, explain, config_file, env, cgroup_text, read_window, run_probe, which, note, look=False):
     """Everything before the exec: (config, unit, apps, window, probes, rule, commands to try)."""
     if cgroup_text is None:
         try:
@@ -570,7 +570,8 @@ def decide(url, explain, config_file, env, cgroup_text, read_window, run_probe, 
 
     probe = cached_probe(config, env, run_probe, note, probes)
     rule = None
-    if explain:
+    if explain or look:
+        # Shown whether a rule asks for it or not.
         window()
     if config and url is not None:
         rule = first_rule(config, url, apps, window, probe)
@@ -583,7 +584,69 @@ def decide(url, explain, config_file, env, cgroup_text, read_window, run_probe, 
     return config, unit, apps, windows[0] if windows else None, probes, rule, found
 
 
-def print_explain(url, unit, apps, seen, probes, rule, found, asks):
+def live_path(env):
+    """The file a settings window keeps while its Live page is shown. Clicks are written there in full."""
+    runtime = env.get("XDG_RUNTIME_DIR", "")
+    return os.path.join(runtime if runtime.startswith("/") else state_dir(env), "browser-selector.live")
+
+
+def open_live(env):
+    """The live file, open for appending. None when no window watches: the handler never makes it."""
+    try:
+        fd = os.open(live_path(env), os.O_WRONLY | os.O_APPEND | os.O_NONBLOCK | os.O_NOFOLLOW)
+    except (OSError, ValueError):
+        return None
+    try:
+        info = os.fstat(fd)
+        # It holds full URLs and window titles: only a private file of the user, and not without end.
+        if (stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o077
+                and info.st_size < LOG_LIMIT):
+            return fd
+    except OSError:
+        pass
+    os.close(fd)
+    return None
+
+
+def write_live(fd, lines):
+    """One click for the Live page. Whatever goes wrong here, the click goes on."""
+    try:
+        text = "\n".join([time.strftime("%H:%M:%S")] + [printable(line) for line in lines]) + "\n\n"
+        os.write(fd, text.encode("utf-8", "backslashreplace"))
+    except Exception:
+        pass
+    finally:
+        os.close(fd)
+
+
+def start_live(env):
+    """For the settings window: from now on every click is written to the live file."""
+    path = live_path(env)
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    try:
+        os.unlink(path)  # never through a link, never into a file of another mode
+    except FileNotFoundError:
+        pass
+    os.close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+
+
+def read_live(env):
+    """The clicks written since start_live, the newest first."""
+    try:
+        text = read_file(live_path(env), errors="replace")
+    except OSError:
+        return []
+    return [click for click in reversed(text.split("\n\n")) if click.strip()]
+
+
+def stop_live(env):
+    try:
+        os.unlink(live_path(env))
+    except OSError:
+        pass
+
+
+def explain_lines(url, unit, apps, seen, probes, rule, found, asks):
     classes, title = seen or (["-"], "-")
     lines = [f"url: {url}"] if url is not None else []
     lines += [f"unit: {unit or '-'}", f"app: {', '.join(apps) or '-'}",
@@ -596,7 +659,11 @@ def print_explain(url, unit, apps, seen, probes, rule, found, asks):
         name, _, argv = (ASK, None, None) if asks else found[0] if found else (None, None, None)
         lines += [f"rule: {rule['name'] if rule else '-'}", f"browser: {name or '-'}",
                   f"command: {shlex.join(argv) if argv else '-'}"]
-    for line in lines:
+    return lines
+
+
+def print_explain(*facts):
+    for line in explain_lines(*facts):
         print(printable(line))
 
 
@@ -1480,9 +1547,12 @@ def main(argv=None, env=None, cgroup_text=None, read_window=read_window, run_pro
         else:
             write_log(env, f"error: {message}")
 
+    # A settings window with its Live page open gets the click as --explain prints it.
+    live = None if explain else open_live(env)
     try:
         config, unit, apps, seen, probes, rule, found = decide(
-            url, explain, config_file, env, cgroup_text, read_window, run_probe, which, note)
+            url, explain, config_file, env, cgroup_text, read_window, run_probe, which, note,
+            look=live is not None)
     except Exception as error:  # whatever broke, the click still opens something
         note(f"{type(error).__name__} before the browser was chosen: last resort")
         config, unit, apps, seen, probes, rule = None, None, [], None, {}, None
@@ -1493,6 +1563,8 @@ def main(argv=None, env=None, cgroup_text=None, read_window=read_window, run_pro
         print_explain(url, unit, apps, seen, probes, rule, found, asks)
         return 0 if found or asks or url is None else 1
 
+    if live is not None:
+        write_live(live, explain_lines(url, unit, apps, seen, probes, rule, found, asks))
     where = f"app={','.join(apps) or '-'} url={url_origin(url)}"
     if asks:
         try:

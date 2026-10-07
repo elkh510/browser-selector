@@ -1,6 +1,6 @@
 # Design
 
-_verified: 2026-10-05_
+_verified: 2026-10-07_
 
 `browser-selector` is registered as the default web browser. For every link
 it looks at where the link came from and starts the browser and profile the
@@ -52,6 +52,15 @@ rule, browser, app ids, scheme and host of the URL. Never the full URL, login
 links carry tokens. Characters that do not print are replaced, a URL or a
 unit name cannot forge a line. The file is mode 0600 in a 0700 directory, it
 lists every host visited. Past 1 MiB it is renamed to `log.1`.
+
+The one place a click is written in full is the live file,
+`$XDG_RUNTIME_DIR/browser-selector.live` (in the state directory when there is
+no runtime directory). The settings window makes it while Live is pressed on
+its Logs page and removes it after; the handler never makes it. While it is
+there, each click reads the window whether a rule asks or not and appends what
+`--explain` prints: the URL, unit, app ids, window, title, probes, rule,
+browser, command. The handler writes only into a regular file of the user
+with mode 0600, never through a link, and stops at 1 MiB.
 
 ## What a rule can look at
 

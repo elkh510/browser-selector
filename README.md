@@ -44,6 +44,7 @@ Started without a link, from the app grid, it shows the settings window.
 | | |
 |---|---|
 | ![Browsers](docs/images/settings-browsers.png) Browsers and profiles, found on the machine or added by hand | ![New rule](docs/images/settings-rule-form.png) A rule: every field that is filled in has to match |
+| ![Live log](docs/images/settings-logs-live.png) Logs with Live pressed: every click with all a rule can match | |
 | ![Test](docs/images/settings-test.png) Test: what a click would open, and by which rule | ![Picker](docs/images/picker.png) The picker, for a rule with `browser = ask`: a digit or Enter chooses |
 
 ## Install
@@ -121,8 +122,9 @@ To write a rule for a new application, see what the handler sees:
     sleep 5; browser-selector --explain https://example.com/
 
 Switch to the application within the five seconds. The `app`, `window` and
-`title` lines are what a rule can match. The "Recent" page of the settings
-window shows the same for the last real clicks.
+`title` lines are what a rule can match. Or press Live on the Logs page of
+the settings window and click the link: the same lines show up there for
+every click, as long as the button is pressed.
 
     browser-selector --check       # validate the config
     browser-selector --discover    # print the browsers and profiles found

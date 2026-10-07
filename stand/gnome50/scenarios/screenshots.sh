@@ -141,11 +141,17 @@ type_text "slack"
 press alt+t
 shot settings-test
 press alt+5
-shot settings-recent
+shot settings-logs
+press alt+l
+sleep 0.5
+"$HANDLER" "https://acme.cloudflareaccess.com/cdn-cgi/access/login?next=1" >/dev/null 2>&1 || true
+sleep 1
+shot settings-logs-live
 press ctrl+q
 wait_exit "$SETTINGS_PID"
 expect_equal "the window is closed with ctrl+q, exit code 0" 0 "$EXIT_CODE"
 expect_equal "and printed nothing" "" "$(cat "$OUT_DIR/settings.log")"
+expect_false "closing the window with Live pressed removes the live file" test -e "$XDG_RUNTIME_DIR/browser-selector.live"
 
 ls -l "$OUT_DIR"/*.png | awk '{ print "     " $5, $NF }'
 finish

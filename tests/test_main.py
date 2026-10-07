@@ -563,6 +563,89 @@ class Explain(HandlerCase):
         self.assertTrue(out.endswith("rule: -\nbrowser: -\ncommand: -\n"), out)
 
 
+class Live(HandlerCase):
+    """The file of the Live page of the settings window: every click in full, only while it is there."""
+
+    def test_nothing_is_written_while_no_window_watches(self):
+        self.write_config(CONFIG)
+        self.handle(URL, cgroup=SLACK, window=SLACK_WINDOW)
+        self.assertFalse(os.path.lexists(bs.live_path(self.env)))
+        self.assertEqual(bs.read_live(self.env), [])
+
+    def test_a_click_is_written_as_explain_prints_it(self):
+        self.write_config(CONFIG)
+        bs.start_live(self.env)
+        self.assertEqual(os.stat(bs.live_path(self.env)).st_mode & 0o777, 0o600)
+        secret = "https://example.com/auth?token=s3cr3t"
+        self.handle(secret, cgroup=SLACK, window=SLACK_WINDOW)
+        self.handle("http://other.org/")
+        newest, first = bs.read_live(self.env)
+        lines = first.splitlines()
+        self.assertRegex(lines[0], r"^\d\d:\d\d:\d\d$")
+        self.assertEqual(lines[1], f"url: {secret}")
+        self.assertIn("app: slack", lines)
+        self.assertIn("window: slack, Slack", lines)
+        self.assertIn("title: Threads - Acme - Slack", lines)
+        self.assertIn("rule: slack-acme", lines)
+        self.assertIn("browser: chrome-work", lines)
+        self.assertIn("url: http://other.org/", newest)
+        # The log keeps to the host all the same
+        self.assertNotIn("s3cr3t", self.log())
+        self.assertEqual(len(self.started), 2)
+
+    def test_the_window_is_read_for_a_click_no_rule_asks_about_it(self):
+        self.write_config(CONFIG)
+        bs.start_live(self.env)
+        self.handle(URL, window=(["editor", "Editor"], "notes.txt"))
+        self.assertIn("title: notes.txt", bs.read_live(self.env)[0])
+
+    def test_stop_removes_it_and_start_empties_it(self):
+        bs.start_live(self.env)
+        self.handle(URL)
+        self.assertEqual(len(bs.read_live(self.env)), 1)
+        bs.start_live(self.env)
+        self.assertEqual(bs.read_live(self.env), [])
+        bs.stop_live(self.env)
+        self.assertFalse(os.path.lexists(bs.live_path(self.env)))
+        bs.stop_live(self.env)
+
+    def test_only_a_private_file_of_the_user_is_written(self):
+        path = bs.live_path(self.env)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        victim = os.path.join(self.tmp, "victim")
+        for make in (lambda: os.symlink(victim, path), lambda: os.mkfifo(path), lambda: os.mkdir(path),
+                     lambda: os.close(os.open(path, os.O_CREAT | os.O_WRONLY, 0o644))):
+            with self.subTest():
+                make()
+                os.path.isfile(path) and os.chmod(path, 0o644)
+                open(victim, "w").close()
+                code, out, err = self.handle(URL)
+                self.assertEqual((code, len(self.started)), (0, 1))
+                self.assertEqual(read(victim), "")
+                if os.path.isfile(path) and not os.path.islink(path):
+                    self.assertEqual(read(path), "")
+                os.rmdir(path) if os.path.isdir(path) and not os.path.islink(path) else os.unlink(path)
+                self.started.clear()
+
+    def test_a_full_file_gets_no_more(self):
+        bs.start_live(self.env)
+        with open(bs.live_path(self.env), "w") as file:
+            file.write("x" * (bs.LOG_LIMIT + 1))
+        self.handle(URL)
+        self.assertEqual(os.path.getsize(bs.live_path(self.env)), bs.LOG_LIMIT + 1)
+
+    def test_start_never_writes_through_a_link(self):
+        path = bs.live_path(self.env)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        victim = os.path.join(self.tmp, "victim")
+        with open(victim, "w") as file:
+            file.write("precious")
+        os.symlink(victim, path)
+        bs.start_live(self.env)
+        self.assertFalse(os.path.islink(path))
+        self.assertEqual(read(victim), "precious")
+
+
 class Log(HandlerCase):
     SECRET = "https://user:hunter2@Login.Example.com:8443/auth/callback?token=s3cr3t&next=/inbox#frag"
 
