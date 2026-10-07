@@ -164,6 +164,25 @@ expect_true "with its name" section_has "browser work" "name = Chromium - Work &
 expect_true "and its command" section_has "browser work" 'command = chromium --profile-directory="Work Profile" {url}'
 expect_true "the file passes --check" "$HANDLER" --check
 
+echo "== the live log =="
+LIVE="$XDG_RUNTIME_DIR/browser-selector.live"
+to_settings
+press alt+5
+sleep 0.5
+expect_false "no live file while Live is not pressed" test -e "$LIVE"
+press alt+l
+sleep 0.5
+expect_true "Live on the Logs page makes the live file" test -f "$LIVE"
+expect_equal "for the user alone" 600 "$(stat -c %a "$LIVE" 2>/dev/null)"
+"$HANDLER" "https://example.com/live?token=1" >/dev/null 2>&1 || true
+sed 's/^/     /' "$LIVE" 2>/dev/null || true
+expect_true "a click is written there with the full URL" grep -qx "url: https://example.com/live?token=1" "$LIVE"
+expect_true "and with the window it came from" grep -q "^window: .*browser-selector" "$LIVE"
+expect_false "the log still has the host alone" grep -q "token" "$XDG_STATE_HOME/browser-selector/log"
+press alt+1
+sleep 0.5
+expect_false "leaving the page removes the file" test -e "$LIVE"
+
 echo "== the default, in the window =="
 to_settings
 press alt+3

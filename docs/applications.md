@@ -17,7 +17,7 @@ rule can match.
 | VS Code | deb | `com.microsoft.VSCode` | `com.microsoft.vscode`, `com.microsoft.VSCode` | window title |
 | NetBird | deb | `netbird` | none of its own | `netbird profile list` |
 | Cloudflare One | deb `cloudflare-warp` | `warp-taskbar` | none of its own | the URL |
-| Telegram | snap, strict | not known, see below | `telegram-desktop`, `TelegramDesktop` | no rule yet |
+| Telegram | snap, strict | not known, see below | `telegram-desktop`, `TelegramDesktop` | all of it by `window`, no account |
 
 ## Slack
 
@@ -105,4 +105,11 @@ never reaches this one.
 
 The snap opens links through the portal, the handler then sits in the cgroup of the portal
 and does not see who asked. Only `window` and `title` are left, and the title holds the chat
-name and unread counters, not the account. No rule is written for it.
+name and unread counters, not the account. So one rule for the whole of Telegram is all
+there is, by the window class:
+
+    [rule telegram]
+    window = TelegramDesktop
+    browser = brave-home
+
+It reads the focused window, so on Wayland it works only while Telegram is an X11 client.

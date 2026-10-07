@@ -31,7 +31,10 @@ PAGES = (("browsers", "Browsers", "web-browser-symbolic"),
          ("rules", "Rules", "view-list-symbolic"),
          ("default", "Default", "emblem-default-symbolic"),
          ("test", "Test", "system-search-symbolic"),
-         ("recent", "Recent", "document-open-recent-symbolic"))
+         ("logs", "Logs", "document-open-recent-symbolic"))
+RECENT_HINT = "The last links opened: the rule, the browser, the app and the host of the link."
+LIVE_HINT = ("Every link clicked from now on, with all that a rule can match: the app, the window, "
+             "the title, the full URL. Nothing of it is kept.")
 BROWSER_FIELDS = (
     ("id", "_Id", "The name the rules use"),
     ("name", "_Name", "What the picker shows"),
@@ -229,14 +232,15 @@ class Settings:
         self.rows = []          # (group, row) of everything fill() put there
         self.filling = False    # fill() moves the list of the default: that is not a change
         self.is_default = False
+        self.watching = 0       # the timer of the live log, 0 while it is off
         self.window = Adw.ApplicationWindow(application=app, title="Browser Selector",
                                             default_width=780, default_height=720)
 
         self.stack = Adw.ViewStack(vexpand=True)
-        pages = (self.browsers_page(), self.rules_page(), self.default_page(), self.test_page(), self.recent_page())
+        pages = (self.browsers_page(), self.rules_page(), self.default_page(), self.test_page(), self.logs_page())
         for (name, title, icon), page in zip(PAGES, pages):
             self.stack.add_titled(page, name, title).set_icon_name(icon)
-        self.stack.connect("notify::visible-child", lambda *args: self.reload())
+        self.stack.connect("notify::visible-child", lambda *args: (self.live.set_active(False), self.reload()))
         switcher = Adw.ViewSwitcher(stack=self.stack, policy=Adw.ViewSwitcherPolicy.WIDE)
         self.problem = error_label()
         self.toasts = Adw.ToastOverlay(child=self.stack)
@@ -251,6 +255,7 @@ class Settings:
         on_keys(self.window, dict(keys, **{"<Control>q": self.window.close, "<Control>w": self.window.close}))
         # The config may be edited by hand next to the window: read it again when the window is back.
         self.window.connect("notify::is-active", lambda *args: self.window.is_active() and self.reload())
+        self.window.connect("close-request", lambda *args: self.live.set_active(False))
         self.fill()
         self.reload()
         self.window.present()
@@ -313,15 +318,52 @@ class Settings:
         page.add(answer)
         return page
 
-    def recent_page(self):
-        self.recent = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
-                                   wrap_mode=Gtk.WrapMode.WORD_CHAR,
-                                   top_margin=12, bottom_margin=12, left_margin=12, right_margin=12)
-        return Gtk.ScrolledWindow(child=self.recent)
+    def logs_page(self):
+        self.live = Gtk.ToggleButton(label="_Live", use_underline=True, valign=Gtk.Align.CENTER)
+        self.live.connect("toggled", self.watch)
+        self.logs = Adw.PreferencesGroup(title="Log", description=RECENT_HINT)
+        self.logs.set_header_suffix(self.live)
+        self.log = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
+                                wrap_mode=Gtk.WrapMode.WORD_CHAR,
+                                top_margin=12, bottom_margin=12, left_margin=12, right_margin=12)
+        self.logs.add(Gtk.Frame(child=self.log))
+        page = Adw.PreferencesPage()
+        page.add(self.logs)
+        return page
+
+    def watch(self, *args):
+        """The live file is there exactly while Live is pressed: leaving the page releases it."""
+        on = self.live.get_active()
+        if on and not self.watching:
+            try:
+                bs.start_live(self.env)
+            except OSError as error:
+                self.say(f"Clicks cannot be watched: {error.strerror}")
+                self.live.set_active(False)
+                return
+            self.watching = GLib.timeout_add(300, self.show_log)
+        elif not on and self.watching:
+            GLib.source_remove(self.watching)
+            self.watching = 0
+            bs.stop_live(self.env)
+        self.logs.set_description(LIVE_HINT if on else RECENT_HINT)
+        self.show_log()
+
+    def show_log(self):
+        if self.watching:
+            text = "\n\n".join(bs.read_live(self.env)) or "Click a link in any app."
+        else:
+            # The newest line first: that is the click the user just made.
+            text = "\n".join(reversed(bs.log_tail(self.env))) or "Nothing was opened yet."
+        buffer = self.log.get_buffer()
+        if text != buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False):
+            buffer.set_text(text)
+        return GLib.SOURCE_CONTINUE
 
     def status_row(self):
         self.status = Gtk.Label(xalign=0, hexpand=True, wrap=True)
-        self.switch = Gtk.Button(use_underline=True, valign=Gtk.Align.CENTER, sensitive=False)
+        self.switch = Gtk.Button(label="Set as _default", use_underline=True, valign=Gtk.Align.CENTER,
+                                 sensitive=False)
         self.switch.connect("clicked", self.switch_default)
         box = Gtk.Box(spacing=12, margin_top=8, margin_bottom=8, margin_start=12, margin_end=12)
         box.append(self.status)
@@ -349,8 +391,7 @@ class Settings:
             problems = [f"The config cannot be read, mend {self.path} by hand:", error]
         else:
             problems = bs.check_model(model, self.which) if any(model.values()) else []
-        # The newest line first: that is the click the user just made.
-        self.recent.get_buffer().set_text("\n".join(reversed(bs.log_tail(self.env))) or "Nothing was opened yet.")
+        self.show_log()
         # Rows are only made again when something changed: a click on a row that was just replaced is lost.
         if (model or bs.empty_model(), problems) != (self.model, self.problems):
             self.model, self.problems = model or bs.empty_model(), problems
@@ -407,16 +448,12 @@ class Settings:
 
     def fill_status(self):
         current = bs.system_default(self.env)
-        previous = bs.previous_default(self.env)
         self.is_default = current == bs.ENTRY
         if self.is_default:
             self.status.set_label("Browser Selector is the default browser of the system.")
-            # An underscore in the name of a desktop entry is not a mnemonic.
-            self.switch.set_label(f"_Put {(previous or 'the previous one').replace('_', '__')} back")
         else:
             self.status.set_label(f"The default browser of the system is {current or 'not known'}.")
-            self.switch.set_label("Make Browser Selector the _default")
-        self.switch.set_sensitive(bool(previous) or not self.is_default)
+        self.switch.set_sensitive(not self.is_default)
         return GLib.SOURCE_REMOVE
 
     def say(self, text):
@@ -494,7 +531,7 @@ class Settings:
              {"browser": self.choices(values.get("browser"))}, save)
 
     def switch_default(self, *args):
-        error = bs.restore_default(self.env) if self.is_default else bs.make_default(self.env)
+        error = bs.make_default(self.env)
         if error:
             self.say(error)
         self.fill_status()

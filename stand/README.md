@@ -565,7 +565,7 @@ nothing on this path.
 **screenshots.sh.** `stand/out/gnome50/screenshots/`: `picker.png`,
 `desktop.png` (the picker over the app), `settings-browsers.png`,
 `settings-rules.png`, `settings-rule-form.png`, `settings-default.png`,
-`settings-test.png`, `settings-recent.png`. Yaru icons, Ubuntu Sans, and the
+`settings-test.png`, `settings-logs.png`, `settings-logs-live.png`. Yaru icons, Ubuntu Sans, and the
 browser icons of Papirus copied into the hicolor of the throwaway home, where
 the packages of the browsers would put theirs. The settings window is a
 Wayland window with the app id `browser-selector`, and the shell takes it for
@@ -581,7 +581,7 @@ Found on the way, not asserted by a scenario:
   `GLib.idle_add` the critical was gone, 3 runs of 3 against 3 of 3 with it.
 * On the Test page the Answer group is cut by the status row at the default
   size of the window, and the lines of Recent do not wrap
-  (`settings-test.png`, `settings-recent.png`).
+  (`settings-test.png`, `settings-logs.png`).
 
 Pitfalls:
 
