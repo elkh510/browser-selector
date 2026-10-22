@@ -101,7 +101,7 @@ time the window saves.
 
     [rule slack-globex]
     app = slack
-    title = - Globex - Slack$
+    title = - Globex - .*Slack
     browser = brave-home
 
     [rule netbird-globex]

@@ -25,11 +25,15 @@ Unit `app-slack-<pid>.scope`. All workspaces live in one process, so `app` alone
 them apart.
 
 Title: `<view> - <Workspace> - Slack`, for example `Threads - Acme - Slack` or
-`<person> (DM) - Globex - Slack`.
+`<person> (DM) - Globex - Slack`. With unread messages Slack puts a counter before its own
+name: `<person> (DM) - Globex - 1 new item - Slack`, `... - 12 new items - Slack`, and during
+a huddle it adds a mark after it: `<person> (DM) - Globex - Slack 🎤`. A rule anchored at the
+end of the title (`- Globex - Slack$`) misses those, so the pattern only asks for the
+workspace between dashes, with `Slack` somewhere after it:
 
     [rule slack-globex]
     app = slack
-    title = - Globex - Slack$
+    title = - Globex - .*Slack
 
 Without the window (Wayland, where the title of a native window cannot be read): the selected
 workspace is in `~/.config/Slack/storage/root-state.json`

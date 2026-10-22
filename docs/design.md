@@ -136,7 +136,7 @@ sensitive keys). Sections in file order:
 
     [rule slack-acme]
     app = slack
-    title = - Acme - Slack$
+    title = - Acme - .*Slack
     browser = chrome-main
 
     [rule netbird-globex]
