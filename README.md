@@ -107,7 +107,7 @@ time the window saves.
     [rule netbird-globex]
     app = netbird
     probe = netbird profile list
-    probe_match = ^globex\s+✓
+    probe_match = ^globex\s+(\*|✓)
     browser = brave-home
 
     [rule cloudflare-team]

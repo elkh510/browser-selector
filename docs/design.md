@@ -142,7 +142,7 @@ sensitive keys). Sections in file order:
     [rule netbird-globex]
     app = netbird
     probe = netbird profile list
-    probe_match = ^globex\s+✓
+    probe_match = ^globex\s+(\*|✓)
     browser = brave-globex
 
     [rule cloudflare-acme]

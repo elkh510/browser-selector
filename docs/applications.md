@@ -82,16 +82,17 @@ the focus at that moment.
 `netbird-ui` runs in `app-gnome-netbird-<pid>.scope`. The login page it opens has nothing to
 do with the focused window, so no `title` here.
 
-`netbird profile list` prints a table, the active profile has a check mark:
+`netbird profile list` prints a table with the active profile marked. NetBird 0.83.1 marks
+it with `*`, older versions with a check mark `✓`, the rule takes both:
 
     NAME     ACTIVE
     default
-    globex   ✓
+    globex   *
 
     [rule netbird-globex]
     app = netbird
     probe = netbird profile list
-    probe_match = ^globex\s+✓
+    probe_match = ^globex\s+(\*|✓)
 
 ## Cloudflare One client
 
